@@ -1,7 +1,7 @@
 from openai import OpenAI
 
-client = OpenAI()
-EMBEDDING_MODEL = "text-embedding-3-small"
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+EMBEDDING_MODEL = "nomic-embed-text"
 BATCH_SIZE = 100
 
 

@@ -1,24 +1,33 @@
+import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from db import engine, Chunk
 from embedder import embed
 
 
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    a, b = np.array(a), np.array(b)
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
 def retrieve(query: str, top_k: int = 5) -> list[dict]:
     query_embedding = embed([query])[0]
-    distance = Chunk.embedding.cosine_distance(query_embedding).label("distance")
 
     with Session(engine) as session:
-        rows = session.execute(
-            select(Chunk, distance).order_by(distance).limit(top_k)
-        ).all()
+        chunks = session.execute(select(Chunk)).scalars().all()
+
+    scored = sorted(
+        ((chunk, _cosine_similarity(query_embedding, chunk.embedding)) for chunk in chunks),
+        key=lambda x: x[1],
+        reverse=True,
+    )
 
     return [
         {
             "source": chunk.source,
             "chunk_index": chunk.chunk_index,
             "content": chunk.content,
-            "score": round(1 - dist, 4),
+            "score": round(score, 4),
         }
-        for chunk, dist in rows
+        for chunk, score in scored[:top_k]
     ]

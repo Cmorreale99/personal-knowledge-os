@@ -1,0 +1,29 @@
+Transformers and Attention Mechanisms
+
+The transformer architecture was introduced in the paper "Attention Is All You Need" by Vaswani et al. in 2017. It replaced recurrent neural networks (RNNs) for sequence-to-sequence tasks and became the foundation for modern large language models.
+
+The core innovation is the self-attention mechanism. Instead of processing tokens sequentially like an RNN, a transformer processes all tokens in parallel and lets each token attend to every other token in the sequence. This allows the model to capture long-range dependencies efficiently.
+
+Self-attention works by computing three vectors for each token: Query (Q), Key (K), and Value (V). The attention score between two tokens is computed as the dot product of Q and K, scaled by the square root of the dimension, then passed through a softmax. The output is a weighted sum of V vectors.
+
+Multi-head attention runs several attention heads in parallel, each learning different kinds of relationships. The outputs are concatenated and projected back to the model dimension.
+
+Positional encodings are added to the input embeddings because the attention mechanism is order-invariant. The original paper used fixed sinusoidal encodings; modern models often use learned positional embeddings or RoPE (Rotary Position Embedding).
+
+RAG (Retrieval-Augmented Generation)
+
+RAG is a technique that improves LLM outputs by grounding them in retrieved external knowledge. Instead of relying solely on knowledge baked into model weights during training, RAG retrieves relevant documents at inference time and includes them in the prompt as context.
+
+The typical RAG pipeline has two phases. In the ingestion phase, documents are chunked into passages, each passage is embedded using an embedding model, and the embeddings are stored in a vector database. In the retrieval phase, the user query is embedded, the vector database is searched for nearest neighbors by cosine similarity, and the top-k passages are injected into the LLM prompt as context.
+
+Vector databases use approximate nearest neighbor (ANN) algorithms like HNSW (Hierarchical Navigable Small World graphs) to make similarity search efficient at scale. pgvector is a PostgreSQL extension that adds vector storage and ANN search directly to Postgres.
+
+Chunking strategy matters significantly. Chunks that are too large dilute relevance; chunks that are too small lose context. Common approaches include fixed token windows with overlap, sentence-level chunking, and semantic chunking based on embedding similarity between sentences.
+
+Embeddings
+
+An embedding is a dense vector representation of text in a high-dimensional space where semantically similar texts are geometrically close. Embedding models are trained with contrastive objectives to pull similar texts together and push dissimilar ones apart.
+
+The quality of embeddings directly determines retrieval quality in a RAG system. Models like nomic-embed-text are optimized for retrieval tasks and produce 768-dimensional vectors. OpenAI's text-embedding-3-small produces 1536-dimensional vectors.
+
+Cosine similarity is the standard metric for comparing embeddings. It measures the angle between two vectors, ignoring their magnitude. A cosine similarity of 1.0 means identical direction (semantically equivalent), 0.0 means orthogonal (unrelated), and -1.0 means opposite.

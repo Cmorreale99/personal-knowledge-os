@@ -1,8 +1,7 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, Text, DateTime, func, text
-from sqlalchemy.orm import DeclarativeBase, Session
-from pgvector.sqlalchemy import Vector
+from sqlalchemy import create_engine, Column, Integer, Text, DateTime, func, ARRAY, Float
+from sqlalchemy.orm import DeclarativeBase
 
 load_dotenv()
 
@@ -20,12 +19,9 @@ class Chunk(Base):
     source = Column(Text, nullable=False)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))
+    embedding = Column(ARRAY(Float))
     created_at = Column(DateTime, server_default=func.now())
 
 
 def init_db():
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.commit()
     Base.metadata.create_all(engine)

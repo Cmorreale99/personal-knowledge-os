@@ -1,8 +1,8 @@
 from openai import OpenAI
 from retriever import retrieve
 
-client = OpenAI()
-MODEL = "gpt-4o-mini"
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+MODEL = "llama3.2"
 
 SYSTEM_PROMPT = (
     "You are a personal knowledge assistant. Answer questions using only the "
