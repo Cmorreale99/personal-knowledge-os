@@ -1,215 +1,117 @@
 # Personal Knowledge OS (KOS)
 
-## Cognition-Aware Semantic Learning Infrastructure
-
-KOS (Personal Knowledge OS) is a cognition-aware retrieval and synthesis system designed to transform raw source knowledge into personalized, implementation-oriented understanding.
-
-Unlike traditional note-taking systems or generic RAG wrappers, KOS separates:
-
-- canonical source knowledge
-- adaptive cognitive behavior
-- synthesized reasoning outputs
-- unresolved learning gaps
-
-This architecture enables the same source material to generate different outputs depending on:
-- cognitive profile
-- implementation goals
-- retrieval strategy
-- prior knowledge state
-- cross-domain synthesis behavior
-
-The system is designed around:
-
-- adaptive semantic transformation
-- multi-document reasoning
-- implementation-oriented synthesis
-- structured gap detection
-- recursive learning feedback loops
+A local-first personal knowledge operating system designed to turn unstructured notes and documents into structured, queryable, learning-oriented infrastructure — with no cloud dependencies or API costs.
 
 ---
 
-# Core System Architecture
+## Current Status
 
-## High-Level Semantic Flow
+This repository currently implements a **working V1 RAG prototype**: local ingestion, embedding, chunk storage, cosine retrieval, and LLM-grounded Q&A. All inference runs locally via Ollama.
+
+**V2** will build the full relational knowledge architecture on top of V1 — CognitiveProfile, Learning_Outputs, Knowledge_Gaps, and multi-document synthesis. That schema is designed and documented below; implementation begins once V1 is stable.
+
+---
+
+## Implemented in V1
+
+- Token-aware document chunking (tiktoken, `cl100k_base` encoding)
+- Local embedding generation via Ollama (`nomic-embed-text`, 768 dimensions)
+- Chunk storage in PostgreSQL with float array embeddings
+- Cosine similarity retrieval over stored chunks (NumPy)
+- Grounded Q&A using a local LLM (`llama3.2` via Ollama)
+- CLI tools for ingestion (`ingest.py`) and querying (`ask.py`, `query.py`)
+
+---
+
+## How the Current Pipeline Works
+
+```
+Source documents → chunking → embedding → Postgres storage
+                                                  ↑
+User query → embedding → cosine similarity search ┘ → local LLM → answer
+```
 
 ```mermaid
 flowchart TD
+    A[Source Documents] --> B[chunker.py\n512-token windows, 64-token overlap]
+    B --> C[embedder.py\nnomic-embed-text via Ollama]
+    C --> D[(PostgreSQL\nchunks table)]
 
-    KB[KnowledgeBase]
-    CP[CognitiveProfile]
-    KG[Knowledge_Gaps]
-    LO[Learning_Outputs]
-    LOD[LearningOutputDocuments]
-
-    KB --> LOD
-    LO --> LOD
-
-    CP --> LO
-    KG --> LO
-
-    KB --> KG
-    LO --> KG
+    E[User Query] --> F[embedder.py\nEmbed query]
+    F --> G[retriever.py\nNumPy cosine similarity]
+    G --> D
+    G --> H[qa.py\nllama3.2 via Ollama]
+    H --> I[Answer + cited sources]
 ```
 
 ---
 
-# Cognitive Processing Pipeline
+## Quickstart
 
-```mermaid
-flowchart TD
+**Prerequisites:** Python 3.10+, PostgreSQL, [Ollama](https://ollama.com)
 
-    A[Source Knowledge]
-    B[Retrieval + Context Assembly]
-    C[Cognitive Adaptation]
-    D[Semantic Synthesis]
-    E[Learning Outputs]
-    F[Gap Detection]
-    G[Targeted Follow-Up Learning]
+```bash
+# 1. Clone and set up environment
+git clone https://github.com/Cmorreale99/personal-knowledge-os.git
+cd personal-knowledge-os
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # macOS/Linux
 
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> B
+# 2. Install dependencies
+pip install sqlalchemy psycopg2-binary numpy tiktoken openai python-dotenv
+
+# 3. Configure environment
+# Create a .env file:
+# DATABASE_URL=postgresql://user:password@localhost:5432/kos
+
+# 4. Pull local models
+ollama pull nomic-embed-text
+ollama pull llama3.2
+
+# 5. Initialize the database
+python -c "from db import init_db; init_db()"
+
+# 6. Ingest a document
+python ingest.py your_notes.txt
+
+# 7. Ask a question
+python ask.py "what did I learn about transformers?"
+
+# Raw retrieval (no LLM, just ranked chunks)
+python query.py "attention mechanism"
 ```
 
----
-
-# Architectural Goals
-
-KOS is designed to solve a core limitation of traditional learning systems:
-
-> Most systems optimize for information retrieval.  
-> KOS additionally optimizes for cognitive integration and implementation-oriented understanding.
-
-The architecture focuses on:
-
-- semantic transformation rather than passive storage
-- cognition-aware synthesis rather than generic summarization
-- implementation relevance rather than surface-level retrieval
-- recursive gap detection rather than static learning artifacts
+> **Note:** A `requirements.txt` is not yet included. The dependency list above is derived from the source files.
 
 ---
 
-# System Layers
+## Current Database Layer
 
-## 1. KnowledgeBase Layer
+The implemented schema stores one row per document chunk:
 
-Canonical source-of-truth knowledge layer.
+```sql
+CREATE TABLE chunks (
+    id           SERIAL PRIMARY KEY,
+    source       TEXT NOT NULL,        -- source filename
+    chunk_index  INTEGER NOT NULL,     -- position within source document
+    content      TEXT NOT NULL,        -- raw chunk text
+    embedding    FLOAT[],              -- 768-dim nomic-embed-text vector
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-Stores:
-- transcripts
-- technical documentation
-- architecture notes
-- research papers
-- implementation references
-- educational content
+This is the V1 retrieval layer. The V2 relational schema (KnowledgeBase, CognitiveProfile, etc.) documented below will be built on top of this foundation.
 
-The source knowledge layer is intentionally separated from:
-- interpretation
-- synthesis
-- cognitive adaptation
-
-This preserves:
-- normalization
-- extensibility
-- retrieval flexibility
-- reprocessing capability
+> **Note on pgvector:** The Python `pgvector` package is installed but not in use. PostgreSQL 18 does not yet have a pre-built pgvector binary. Cosine similarity is computed in Python with NumPy, which is sufficient at personal scale.
 
 ---
 
-## 2. CognitiveProfile Layer
+## V2 Architecture
 
-Adaptive inference and transformation layer.
+V2 expands the flat chunk store into a full relational knowledge layer. The schema is designed; implementation follows V1 stabilization.
 
-Controls:
-- retrieval behavior
-- explanation structure
-- semantic linking
-- cross-domain synthesis
-- implementation emphasis
-- prior knowledge integration
-
-The cognitive profile does not own knowledge.
-
-Instead:
-> it governs how knowledge is transformed into understanding.
-
-This enables:
-- personalized synthesis
-- adaptive learning workflows
-- cognition-aware retrieval orchestration
-
----
-
-## 3. Learning_Outputs Layer
-
-Core semantic synthesis and reasoning layer.
-
-Stores:
-- synthesized understanding
-- implementation implications
-- contextual reasoning
-- semantic mappings
-- cross-domain synthesis
-- implementation-oriented learning artifacts
-
-This table intentionally functions as both:
-- an output layer
-- a semantic relationship layer
-
-because outputs themselves encode:
-- contextual relationships
-- implementation relevance
-- prior knowledge connections
-- semantic synthesis behavior
-
----
-
-## 4. Knowledge_Gaps Layer
-
-Deficiency detection and learning objective layer.
-
-Tracks:
-- conceptual weaknesses
-- implementation gaps
-- technical/tooling deficiencies
-
-Knowledge gaps may:
-- originate from source material
-- emerge during synthesis
-- drive future retrieval and synthesis behavior
-
-This creates recursive adaptive learning loops.
-
----
-
-## 5. LearningOutputDocuments Layer
-
-Multi-document semantic synthesis junction layer.
-
-Supports:
-- many-to-many synthesis relationships
-- provenance tracking
-- explainable retrieval
-- contextual reasoning
-- cross-domain aggregation
-
-A single synthesized output may depend on:
-- multiple transcripts
-- architecture notes
-- technical papers
-- prior summaries
-- implementation references
-
-This enables:
-> multi-source semantic synthesis rather than isolated document summarization.
-
----
-
-# Relational Architecture
+Five relational layers:
 
 ```mermaid
 erDiagram
@@ -273,218 +175,74 @@ erDiagram
     }
 
     CognitiveProfile ||--o{ Learning_Outputs : drives
-
     KnowledgeBase ||--o{ Knowledge_Gaps : exposes
     Learning_Outputs ||--o{ Knowledge_Gaps : surfaces
-
     Knowledge_Gaps ||--o{ Learning_Outputs : guides
-
     KnowledgeBase ||--o{ LearningOutputDocuments : contributes
     Learning_Outputs ||--o{ LearningOutputDocuments : uses
 ```
 
----
+**Layer summary:**
 
-# System Execution Flow
+- **KnowledgeBase** — canonical source-of-truth: transcripts, papers, architecture notes, documentation
+- **CognitiveProfile** — governs how knowledge is transformed into understanding; controls retrieval behavior, explanation structure, and synthesis strategy
+- **Learning_Outputs** — synthesized understanding, implementation implications, and contextual reasoning artifacts
+- **Knowledge_Gaps** — detected conceptual weaknesses, implementation gaps, and technical deficiencies that drive future retrieval
+- **LearningOutputDocuments** — junction table enabling many-to-many synthesis across multiple source documents
 
-## Stage 1 — Knowledge Ingestion
-
-Inputs:
-- transcripts
-- documents
-- technical notes
-- research papers
-- architecture references
-
-Outputs:
-- normalized source artifacts stored in `KnowledgeBase`
+The goal: the same source material produces different outputs depending on cognitive profile, implementation context, and prior knowledge state.
 
 ---
 
-## Stage 2 — Retrieval + Context Assembly
+## Roadmap
 
-The system retrieves:
-- relevant documents
-- prior outputs
-- implementation context
-- cross-domain references
+### V1 — Hardening (current)
+- [ ] Add `requirements.txt`
+- [ ] Add `.env.example`
+- [ ] Handle duplicate ingestion (skip already-indexed sources)
+- [ ] Add basic CLI flags (`--top-k`, `--model`)
+- [ ] Migrate to pgvector once PG18 support ships (drop NumPy fallback)
+- [ ] Semantic chunking (split on paragraph/sentence boundaries)
+- [ ] Retrieval tracing (log which chunks were surfaced per query)
 
-Retrieval behavior is modified by the active `CognitiveProfile`.
+### V2 — Relational Knowledge Layer
+- [ ] Implement `KnowledgeBase` table and ingestion mapping
+- [ ] Implement `Learning_Outputs` storage for synthesized Q&A responses
+- [ ] Implement `Knowledge_Gaps` detection pass
+- [ ] Implement `LearningOutputDocuments` provenance tracking
+- [ ] Implement `CognitiveProfile` configuration
+- [ ] Hybrid retrieval (BM25 + vector) and reranking
 
----
+### V2 — Evaluation and Diagnostics
+- [ ] Confidence scoring on retrieved chunks
+- [ ] Prompt/response history logging
+- [ ] Gap detection and recursive learning loop
 
-## Stage 3 — Cognitive Adaptation
-
-The cognitive profile modifies:
-- synthesis structure
-- explanation density
-- implementation emphasis
-- semantic linkage behavior
-- cross-domain reasoning strategy
-
----
-
-## Stage 4 — Semantic Synthesis
-
-The LLM generates:
-- implementation-oriented summaries
-- contextual reasoning
-- semantic mappings
-- prior knowledge integration
-- system relevance analysis
-
-Outputs stored in:
-- `Learning_Outputs`
+### V2 — Interface and Orchestration
+- [ ] Structured ingestion pipeline (watch folder, auto-ingest)
+- [ ] Interactive CLI or lightweight web interface
 
 ---
 
-## Stage 5 — Gap Detection
+## What V2 Adds
 
-The system identifies:
-- unresolved concepts
-- implementation weaknesses
-- technical deficiencies
+Not yet implemented — targeted for V2:
 
-Outputs stored in:
-- `Knowledge_Gaps`
-
----
-
-## Stage 6 — Recursive Learning Loop
-
-Knowledge gaps become:
-- future learning objectives
-- retrieval constraints
-- targeted synthesis inputs
-
-This creates:
-> iterative adaptive learning behavior.
+- Full relational schema: KnowledgeBase, CognitiveProfile, Learning_Outputs, Knowledge_Gaps, LearningOutputDocuments
+- Multi-document provenance tracking
+- pgvector / production vector indexing (pending PG18 binary)
+- Hybrid retrieval, reranking, and retrieval tracing
+- Gap detection and recursive learning loops
+- Prompt/response history logging
+- Lightweight web interface or interactive CLI
+- Orchestration pipelines
 
 ---
 
-# Architectural Differentiators
+## Why This Project Matters
 
-## Cognition-Aware Retrieval and Synthesis
+Most personal knowledge tools optimize for capture. KOS is designed to optimize for **retrieval and reuse** — turning accumulated notes into infrastructure you can query, reason over, and build on.
 
-Most RAG systems optimize:
-- retrieval relevance
+The V1 prototype establishes the retrieval foundation. The planned architecture addresses the harder problem: encoding not just what you know, but how your understanding connects across domains, what gaps remain, and what you should learn next.
 
-KOS additionally optimizes:
-- cognitive compatibility
-- semantic integration
-- implementation-oriented reasoning
-- adaptive synthesis behavior
-
----
-
-## Multi-Document Semantic Reasoning
-
-Outputs are generated from:
-- heterogeneous knowledge artifacts
-- cross-domain relationships
-- implementation context
-- prior synthesized understanding
-
-This enables:
-> semantic synthesis rather than isolated summarization.
-
----
-
-## Structured Recursive Learning
-
-The system recursively:
-- identifies weaknesses
-- generates targeted follow-up retrieval
-- refines understanding
-- builds implementation-oriented learning loops
-
----
-
-## Implementation-Oriented Knowledge Transformation
-
-KOS explicitly prioritizes:
-- architecture reasoning
-- implementation implications
-- system relevance
-- operational understanding
-
-rather than passive note generation.
-
----
-
-# Current V1 Constraints
-
-The current architecture intentionally excludes:
-
-- embeddings
-- vector indexes
-- chunking layer
-- orchestration logs
-- prompt execution history
-- concept graph layer
-- retrieval tracing
-
-These components are deferred until:
-- operational usage patterns emerge
-- retrieval bottlenecks appear
-- orchestration behavior stabilizes
-
----
-
-# Planned V2 Expansion
-
-## Retrieval Layer
-- `DocumentChunks`
-- `Embeddings`
-- vector indexes
-
----
-
-## Semantic Layer
-- concept graph reasoning
-- semantic relationship modeling
-- ontology expansion
-
----
-
-## Orchestration Layer
-- retrieval tracing
-- prompt execution logging
-- synthesis orchestration pipelines
-
----
-
-## Execution Layer
-- implementation task tracking
-- coding workflow integration
-- execution feedback loops
-
----
-
-# Architectural Summary
-
-KOS is not:
-- a traditional PKM system
-- a passive document repository
-- a generic AI note-taking tool
-- a simple RAG wrapper
-
-KOS is:
-
-```text
-Cognition-Aware Semantic Learning Infrastructure
-```
-
-The system transforms:
-- raw information
-
-into:
-- personalized implementation-oriented understanding
-
-through:
-- adaptive retrieval
-- semantic synthesis
-- cognitive transformation
-- recursive feedback loops
-- multi-document contextual reasoning
-- structured implementation-oriented learning
+This is learning infrastructure, not note-taking software.
